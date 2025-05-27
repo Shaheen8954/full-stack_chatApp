@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: frontend-deployment
+    namespace: chat-app
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: chatapp-frontend
+    template:
+        metadata:
+            name: frontend-pod
+            namespace: chat-app
+            labels:
+                app: chatapp-frontend
+        spec:
+            containers:
+            - name: frontend-pod
+              image: shaheen8954/chatapp-frontend:latest
+              ports:
+              - containerPort: 80
+              env:
+              - name: NODE_ENV
+                value: production
+              - name: BACKEND_URL
+                value: "http://backend:5001"
+              volumeMounts:
+              - name: frontend-config
+                mountPath: /etc/nginx/conf.d/default.conf
+                subPath: nginx.conf
+            volumes:
+            - name: frontend-config
+              configMap:
+                name: frontend-config
