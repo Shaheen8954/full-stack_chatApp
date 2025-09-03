@@ -10,8 +10,13 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git branch: 'DevOps',
-                    url: 'https://github.com/Shaheen8954/full-stack_chatApp.git
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: 'refs/heads/DevOps']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/Shaheen8954/full-stack_chatApp.git'
+                    ]]
+                ])
             }
         }
 
