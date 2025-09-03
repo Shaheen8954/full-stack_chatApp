@@ -2,10 +2,16 @@ pipeline {
     agent any
 
     stages {
+        stage('CleanWorkspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
         stage('Checkout') {
             steps {
-                git branch: 'master',
-                    url: 'https://github.com/iemafzalhassan/full-stack_chatApp.git'
+                git branch: 'DevOps',
+                    url: 'https://github.com/Shaheen8954/full-stack_chatApp.git
             }
         }
 
