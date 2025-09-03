@@ -11,12 +11,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: 'refs/heads/DevOps']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/Shaheen8954/full-stack_chatApp.git'
-                    ]]
-                ])
+                        url: 'https://github.com/Shaheen8954/full-stack_chatApp.git', branch: 'DevOps'
+                    ])
             }
         }
 
