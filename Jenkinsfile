@@ -68,14 +68,15 @@ pipeline {
                 }
             }
         }
-    }
-
+        
         stage('Deploy') {
-                    steps {
-                        script {
-                           sh 'docker compose up -d'
-                    }
+            steps {
+                script {
+                    sh 'docker compose up -d'
                 }
+            }
+        }
+    }
     
     post { 
         success { 
@@ -85,5 +86,4 @@ pipeline {
             echo 'Deployment failed. Please check the logs for more details.'
         }
     }  
-}
 }
