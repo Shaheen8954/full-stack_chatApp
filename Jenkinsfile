@@ -10,7 +10,7 @@ pipeline {
         Migration_Image_Name = 'chatapp-backend'
         Url = ('https://github.com/Shaheen8954/full-stack_chatApp.git')
         Branch = "DevOps"
-        PortNumber = '5001:5001'
+        PortNumber = '8081:80'
     }
 
     stages {
@@ -30,26 +30,36 @@ pipeline {
             }
         }
         
-        stage('Build image') {
+        stage('Build Backend Image') {
             steps {
                 script {
-                    dockerbuild(env.DockerHubUser, env.ProjectName, env.ImageTag)
+                    dir('backend') {
+                        dockerbuild(env.DockerHubUser, env.Migration_Image_Name, env.ImageTag)
+                    }
                 }
             }
         }
 
-        stage('Build Migration image') {
+        stage('Build Frontend Image') {
             steps {
                 script {
-                    dockerbuild(env.DockerHubUser, env.Migration_Image_Name, env.ImageTag)
+                    dir('frontend') {
+                        dockerbuild(env.DockerHubUser, env.ProjectName, env.ImageTag)
+                    }
                 }
             }
         }
         
-        
-        stage('Push Docker Image') {
+        stage('Push Docker Images') {
             parallel {
-                stage('Push to Docker Hub') {
+                stage('Push Backend Image') {
+                    steps {
+                        script {
+                            dockerpush(env.DockerHubUser, env.Migration_Image_Name, env.ImageTag)
+                        }
+                    }
+                }
+                stage('Push Frontend Image') {
                     steps {
                         script {
                             dockerpush(env.DockerHubUser, env.ProjectName, env.ImageTag)
@@ -58,26 +68,21 @@ pipeline {
                 }
             }
         }
+    }
 
-        stage('Push Migration Image') {
-            parallel {
-                stage('Push to Docker Hub') {
+                 stage('Deploy') {
                     steps {
                         script {
-                            dockerpush(env.DockerHubUser, env.Migration_Image_Name, env.ImageTag)
-                        }
+                           sh 'docker compose up -d'
                     }
                 }
-            }
-        }
-    }
     
     post { 
         success { 
-            echo 'Deployment and tests completed successfully!'
+            echo 'Deployment completed successfully!'
         } 
         failure { 
-            echo 'Deployment or tests failed. ho gya bro'
+            echo 'Deployment failed. Please check the logs for more details.'
         }
     }  
 }
