@@ -1,83 +1,83 @@
+@Library('Shared@main') _
+
 pipeline {
     agent any
     
     environment {
-        DOCKERHUB_USER = credentials('dockerhub-username')   // store in Jenkins credentials
-        DOCKERHUB_PASS = credentials('dockerhub-password')
-        IMAGE_NAME = "shaheen8954/chatapp"   // your DockerHub repo
-        IMAGE_TAG = "latest"
+        DockerHubUser = 'shaheen8954'
+        ProjectName = 'chatapp'
+        ImageTag = "${BUILD_NUMBER}"
+        Migration_Image_Name = 'chatapp-backend'
+        Url = ('https://github.com/Shaheen8954/full-stack_chatApp.git')
+        Branch = "DevOps"
+        PortNumber = '5001:5001'
     }
-    
+
     stages {
-        // 1️⃣ Clean workspace and stop old containers
-        stage('Clean Workspace') {
-            steps {
-                cleanWs()
-                sh '''
-                    docker compose down || true
-                    docker system prune -f || true
-                '''
-            }
-        }
-
-        // 2️⃣ Clone GitHub repo
-        stage('Checkout Code') {
-            steps {
-                git branch: 'DevOps', url: 'https://github.com/Shaheen8954/full-stack_chatApp.git'
-            }
-        }
-
-        // 3️⃣ Filesystem Security Scan (Trivy)
-        stage('Filesystem Security Scan') {
-            steps {
-                sh '''
-                    mkdir -p trivy-results/filesystem
-                    trivy fs . --severity HIGH,CRITICAL --format table --output trivy-results/filesystem/fs-scan.txt || true
-                '''
-                archiveArtifacts artifacts: 'trivy-results/filesystem/*', allowEmptyArchive: true
-            }
-        }
-
-        // 4️⃣ Build & Push Docker image
-        stage('Build & Push Docker Image') {
+        stage('Cleanup Workspace') {
             steps {
                 script {
-                    sh '''
-                        echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
-                        docker build -t $IMAGE_NAME:$IMAGE_TAG .
-                        docker push $IMAGE_NAME:$IMAGE_TAG
-                    '''
+                    cleanWs()
+                }
+            }
+        }
+        
+        stage('Clone Repository') {
+            steps {
+                script {
+                    clone(env.Url, env.Branch)
+                }
+            }
+        }
+        
+        stage('Build image') {
+            steps {
+                script {
+                    dockerbuild(env.DockerHubUser, env.ProjectName, env.ImageTag)
                 }
             }
         }
 
-        // 5️⃣ Trivy Scan for Image
-        stage('Trivy Image Scan') {
+        stage('Build Migration image') {
             steps {
-                sh '''
-                    mkdir -p trivy-results/images
-                    trivy image $IMAGE_NAME:$IMAGE_TAG --severity HIGH,CRITICAL --format table --output trivy-results/images/image-scan.txt || true
-                '''
-                archiveArtifacts artifacts: 'trivy-results/images/*', allowEmptyArchive: true
+                script {
+                    dockerbuild(env.DockerHubUser, env.Migration_Image_Name, env.ImageTag)
+                }
+            }
+        }
+        
+        
+        stage('Push Docker Image') {
+            parallel {
+                stage('Push to Docker Hub') {
+                    steps {
+                        script {
+                            dockerpush(env.DockerHubUser, env.ProjectName, env.ImageTag)
+                        }
+                    }
+                }
             }
         }
 
-        // 6️⃣ Deploy with Docker Compose
-        stage('Deploy with Docker Compose') {
-            steps {
-                sh '''
-                    docker compose up -d --build
-                '''
+        stage('Push Migration Image') {
+            parallel {
+                stage('Push to Docker Hub') {
+                    steps {
+                        script {
+                            dockerpush(env.DockerHubUser, env.Migration_Image_Name, env.ImageTag)
+                        }
+                    }
+                }
             }
         }
     }
     
-    post {
-        success {
-            echo '✅ Build and Deploy successful!'
+    post { 
+        success { 
+            echo 'Deployment and tests completed successfully!'
+        } 
+        failure { 
+            echo 'Deployment or tests failed. ho gya bro'
         }
-        failure {
-            echo '❌ Build failed. Check logs.'
-        }
-    }
+    }  
 }
