@@ -34,7 +34,7 @@ pipeline {
             steps {
                 script {
                     // Start services in detached mode
-                    sh 'docker-compose up -d --build'
+                    sh 'docker compose up -d --build'
                     
                     // Wait for services to be ready
                     sh '''
@@ -75,7 +75,7 @@ pipeline {
         always {
             script {
                 // Stop and remove containers
-                sh 'docker-compose down'
+                sh 'docker compose down'
             }
         }
         success {
