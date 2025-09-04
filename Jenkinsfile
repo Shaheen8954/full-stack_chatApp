@@ -1,54 +1,83 @@
 pipeline {
     agent any
     
+    environment {
+        DOCKERHUB_USER = credentials('dockerhub-username')   // store in Jenkins credentials
+        DOCKERHUB_PASS = credentials('dockerhub-password')
+        IMAGE_NAME = "shaheen8954/chatapp"   // your DockerHub repo
+        IMAGE_TAG = "latest"
+    }
+    
     stages {
-        // Clean the workspace to ensure a fresh start
-        stage('Clean Up') {
+        // 1️⃣ Clean workspace and stop old containers
+        stage('Clean Workspace') {
             steps {
                 cleanWs()
                 sh '''
-                    # Stop and remove any running containers
-                    docker-compose down || true
-                    
-                    # Clean up unused Docker resources
-                    docker system prune -f
+                    docker compose down || true
+                    docker system prune -f || true
                 '''
             }
         }
 
-        // Get the latest code from GitHub
-        stage('Get Code') {
+        // 2️⃣ Clone GitHub repo
+        stage('Checkout Code') {
             steps {
-                git branch: 'DevOps', 
-                url: 'https://github.com/Shaheen8954/full-stack_chatApp.git'
+                git branch: 'DevOps', url: 'https://github.com/Shaheen8954/full-stack_chatApp.git'
             }
         }
 
-        // Build and start the application
-        stage('Build & Run') {
+        // 3️⃣ Filesystem Security Scan (Trivy)
+        stage('Filesystem Security Scan') {
             steps {
-                sh 'docker-compose up -d --build'
+                sh '''
+                    mkdir -p trivy-results/filesystem
+                    trivy fs . --severity HIGH,CRITICAL --format table --output trivy-results/filesystem/fs-scan.txt || true
+                '''
+                archiveArtifacts artifacts: 'trivy-results/filesystem/*', allowEmptyArchive: true
             }
         }
 
-        // Run tests (add your test commands here)
-        stage('Test') {
+        // 4️⃣ Build & Push Docker image
+        stage('Build & Push Docker Image') {
             steps {
-                sh 'echo "Running tests..."'
-                // Example test commands:
-                // sh 'cd frontend && npm test'
-                // sh 'cd backend && npm test'
+                script {
+                    sh '''
+                        echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+                        docker build -t $IMAGE_NAME:$IMAGE_TAG .
+                        docker push $IMAGE_NAME:$IMAGE_TAG
+                    '''
+                }
+            }
+        }
+
+        // 5️⃣ Trivy Scan for Image
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                    mkdir -p trivy-results/images
+                    trivy image $IMAGE_NAME:$IMAGE_TAG --severity HIGH,CRITICAL --format table --output trivy-results/images/image-scan.txt || true
+                '''
+                archiveArtifacts artifacts: 'trivy-results/images/*', allowEmptyArchive: true
+            }
+        }
+
+        // 6️⃣ Deploy with Docker Compose
+        stage('Deploy with Docker Compose') {
+            steps {
+                sh '''
+                    docker compose up -d --build
+                '''
             }
         }
     }
     
-    // Clean up after the build
     post {
         success {
-            echo 'Build successful! 🎉'
+            echo '✅ Build and Deploy successful!'
         }
         failure {
-            echo 'Build failed. Check the logs for details.'
+            echo '❌ Build failed. Check logs.'
         }
     }
 }
