@@ -29,15 +29,21 @@ services:
   mongo:
     image: mongo:6.0
     container_name: mongo
-    restart: always
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: admin
-      MONGO_INITDB_DATABASE: chatApp
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=admin
+      - MONGO_INITDB_DATABASE=chatApp
     volumes:
-      - mongodb_data:/data/db
+      - mongo-data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
     networks:
       - chat-network
 
@@ -46,4 +52,4 @@ networks:
     driver: bridge
 
 volumes:
-  mongodb_data:
+  mongo-data:

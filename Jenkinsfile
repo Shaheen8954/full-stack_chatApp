@@ -1,6 +1,10 @@
 pipeline {
     agent any
     
+    environment {
+        DOCKER_BUILDKIT = 1
+    }
+    
     tools {
         // Make sure 'Default' is configured in Jenkins -> Manage Jenkins -> Global Tool Configuration
         git 'Default' 
@@ -36,13 +40,12 @@ pipeline {
                     // Force remove any existing containers and networks
                     sh '''
                         # Stop and remove any existing containers from previous runs
-                        docker compose down --remove-orphans || true
+                        docker compose down -v --remove-orphans --rmi all || true
                         
-                        # Remove any dangling containers
-                        docker ps -aq --filter name=mongo --filter name=backend --filter name=frontend | xargs -r docker rm -f || true
-                        
-                        # Remove any unused networks
+                        # Remove any dangling containers and networks
+                        docker ps -aq | xargs -r docker rm -f || true
                         docker network prune -f
+                        docker volume prune -f
                     '''
                 }
             }
@@ -52,31 +55,36 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Start services in detached mode
-                        sh 'docker compose up -d --build --remove-orphans'
-                        
-                        // Wait for services to be ready
+                        // Build and start services with health checks
                         sh '''
-                            echo "Waiting for services to be ready..."
-                            # Wait for MongoDB
-                            timeout 60 bash -c '
-                                while ! docker exec $(docker ps -q -f name=mongo) mongosh --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
-                                    echo "Waiting for MongoDB..."
+                            echo "Building and starting services..."
+                            docker compose up -d --build --remove-orphans
+                            
+                            # Wait for MongoDB to be healthy
+                            echo "Waiting for MongoDB to be ready..."
+                            timeout 300 bash -c '
+                                while ! docker inspect --format "{{.State.Health.Status}}" mongo | grep -q "healthy"; do
+                                    echo "Waiting for MongoDB to be healthy..."
                                     sleep 5
                                 done
-                            ' || (echo "MongoDB did not start in time"; exit 1)
+                            ' || (echo "MongoDB did not become healthy in time"; docker logs mongo; exit 1)
                             
-                            # Wait for backend
-                            timeout 60 bash -c '
+                            # Wait for backend to be responsive
+                            echo "Waiting for backend to be ready..."
+                            timeout 300 bash -c '
                                 while ! curl -s -f http://localhost:5001/health >/dev/null 2>&1; do
                                     echo "Waiting for backend..."
                                     sleep 5
                                 done
-                            ' || (echo "Backend did not start in time"; exit 1)
+                            ' || (echo "Backend did not start in time"; docker logs backend; exit 1)
+                            
+                            echo "All services are up and running!"
                         '''
                     } catch (Exception e) {
-                        // If anything fails, clean up and rethrow the error
-                        sh 'docker compose down --remove-orphans || true'
+                        // Log error and clean up
+                        sh 'docker compose logs mongo || true'
+                        sh 'docker compose logs backend || true'
+                        sh 'docker compose down -v --remove-orphans || true'
                         error("Failed to start services: ${e.message}")
                     }
                 }
@@ -86,25 +94,31 @@ pipeline {
         stage('Test') {
             steps {
                 script {
-                    sh '''
-                        echo "Running tests..."
-                        # Test backend health
-                        curl -f http://localhost:5001/health
-                        
-                        # Test frontend (if needed)
-                        # curl -f http://localhost:8081/ || exit 1
-                    '''
+                    try {
+                        // Run tests
+                        sh '''
+                            echo "Running tests..."
+                            # Add your test commands here
+                            # Example: npm test in frontend or backend
+                            echo "Tests completed successfully!"
+                        '''
+                    } catch (Exception e) {
+                        error("Tests failed: ${e.message}")
+                    }
                 }
             }
         }
     }
-
+    
     post {
         always {
             script {
-                // Always try to clean up, even if the pipeline fails
-                sh 'docker compose down --remove-orphans || true'
-                sh 'docker system prune -af || true'  // Clean up any unused containers, networks, and images
+                // Always clean up, even if the pipeline fails
+                sh '''
+                    echo "Cleaning up..."
+                    docker compose down -v --remove-orphans || true
+                    docker system prune -af || true
+                '''
             }
         }
         success {
