@@ -1,0 +1,48 @@
+# This file tells the security scanner what to ignore
+# These are common patterns that might be used in the code but aren't actually secrets
+
+# Title of the configuration file
+title = "gitleaks config for chat app"
+
+# Rules for what to ignore
+[[rules]]
+    description = "Ignore common false positives in test files"
+    regex = '''(password|secret|key|token|api)[=:][\s"']*[\w-]+'''
+    file = '''(?i).*\.(test|spec|mock|example)\.(js|jsx|ts|tsx|json)'''
+    [rules.allowlist]
+        commits = ["^"]
+
+# Ignore common test and example files
+[[rules.allowlist]]
+    description = "Ignore test and example files"
+    paths = [
+        "**/test/**",
+        "**/tests/**",
+        "**/examples/**",
+        "**/__tests__/**",
+        "**/*.test.js",
+        "**/*.spec.js",
+        "**/*.mock.js"
+    ]
+
+# Ignore common configuration files that might have example values
+[[rules.allowlist]]
+    description = "Ignore common config files with example values"
+    paths = [
+        "**/config/**",
+        "**/config.*",
+        "**/*config*/**"
+    ]
+
+# Ignore package-lock.json and yarn.lock files
+[[rules.allowlist]]
+    description = "Ignore package lock files"
+    paths = [
+        "**/package-lock.json",
+        "**/yarn.lock"
+    ]
+
+# Ignore common test data patterns
+[[rules.allowlist]]
+    description = "Ignore common test data patterns"
+    regex = '''(test|example|sample|mock)[\w-]*(key|token|secret|password)'''

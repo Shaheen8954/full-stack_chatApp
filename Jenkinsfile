@@ -62,7 +62,12 @@ pipeline {
                                     wget -q -O gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.18.1/gitleaks_8.18.1_linux_x64.tar.gz
                                     tar xf gitleaks.tgz gitleaks
                                     chmod +x gitleaks
-                                    ./gitleaks detect --source . --report-format sarif --report-path gitleaks-report.json || true
+                                    # Run gitleaks with our config file
+                                    if [ -f .gitleaks.toml ]; then
+                                        ./gitleaks detect --source . --report-format sarif --report-path gitleaks-report.json --config .gitleaks.toml || true
+                                    else
+                                        ./gitleaks detect --source . --report-format sarif --report-path gitleaks-report.json || true
+                                    fi
                                     rm -f gitleaks.tgz gitleaks
                                 '''
                                 // Archive the report whether it found issues or not
